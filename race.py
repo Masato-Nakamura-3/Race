@@ -119,7 +119,7 @@ def single_race(mu, sigma, max_cycle = 100, threshold = 0.7, init = 0.1, rate = 
 
         if cm == True:
             # Chen and Mirman's weighting function and decay.
-            nacti = acti[-1] + np.where(tacti > 0, (1 - acti[-1]) * tacti, acti[-1] * tacti)  - np.tile(decay, ncomp)
+            nacti = acti[-1] + np.where(tacti > 0, (1 - acti[-1]) * tacti, acti[-1] * tacti)  - np.tile(decay, ncomp) * acti[-1]
         else:
             nacti = acti[-1] + tacti
 
@@ -174,37 +174,37 @@ def race(mu, sigma, nrace, max_cycle = 100, threshold = 10, init = 0.1, rate = 0
     -------
     actmat_all
         A numpy array of the amount of activation. Axis 0: trial; axis 1: cycle; axis 2: competitor.
-    """    
-    
+    """
+
     # Reshape mu and create a two dimension array (Context x Competitor)
     if mu.ndim == 1:
         mu = np.reshape(mu, [1, len(mu)])
     elif mu.ndim > 2:
         print("Too many dimensions for mu")
-    
+
     ncontext = np.shape(mu)[0]
-    ncompetitor = np.shape(mu)[1] 
-    
+    ncompetitor = np.shape(mu)[1]
+
     # Generate slots to store activation
     actmat_all = np.zeros([ncontext, nrace, max_cycle + 1, ncompetitor])
-    
+
     # Loop for each context
     for i in range(0, ncontext):
-        
+
         # Loop for each trial
         for j in range(0, nrace):
-        # Get the activation for one trial / race        
+        # Get the activation for one trial / race
             temp_actmat = single_race(mu[i], sigma, max_cycle = max_cycle, threshold = threshold, init = init, rate = rate, sigmoid = sigmoid, beta = beta, x_zero = x_zero, cm = cm, decay = decay)
             # Replace the slots with the generated activation
             actmat_all[i, j] = temp_actmat
-        
-        
-        
+
+
+
     return actmat_all
 
 def act2df(activation, threshold):
     """Turn a 4-dimension activation matrix for a single context (Context x Trial x Cycle x Competitor) to an analyzable dataframe.
-   
+
     The first output data frame shows the results of all races, and the second one shows the summary of each type of responses in each context.
     Note that when no item reaches a threshold in a trial, no data will be generated for that. (i.e. No winner)
 
@@ -237,14 +237,14 @@ def act2df(activation, threshold):
     win_count = df_trial[["context_id", "response", "ft"]].groupby(["context_id", "response"], as_index = False).count().rename(columns = {"ft": "count"})
 
     df_summary = pd.merge(pd.merge(average_ft, total_count), win_count)
-  
+
     # Compute cloze probabilities
     df_summary["cloze_prob"] = df_summary["count"] / df_summary["total_count"]
-    
+
     # Get modal cloze probs
     m_cloze = df_summary[["context_id", "cloze_prob"]].groupby(["context_id"], as_index = False).max().rename(columns = {"cloze_prob": "modal_prob"})
     df_summary = pd.merge(df_summary, m_cloze, how = "left")
-    
+
     # Import the cloze data back to the trial data
     df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "modal_prob"]], how = "left")
 
@@ -256,26 +256,26 @@ def act2df(activation, threshold):
 def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, rate = 0.2, sigmoid = True, beta = 35, x_zero = 0.5, decay = 0):
 
     # Basically the same as other race + act2df, but runs faster without outputting activation patterns
-    
+
     ncontext = np.shape(mu)[0]
-    ncompetitor = np.shape(mu)[1] 
+    ncompetitor = np.shape(mu)[1]
 
     context = []
     winner = []
     ft = []
-    
+
     # Progress
     ten_pcs = [round(nc * ncompetitor / 10) for nc in range(1, 10)]
     pcs = 10
 
-    
-    
+
+
     # Reshape mu and create a two dimension array (Context x Competitor)
     if mu.ndim == 1:
         mu = np.reshape(mu, [1, len(mu)])
     elif mu.ndim > 2:
         print("Too many dimensions for mu")
-    
+
     # Set initial values. If an integer is passed, copy that and create an array.
     # If an array is passed, use that as the initial values.
     if (type(init) == int) | (type(init) == float):
@@ -284,20 +284,20 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
         initial = init.reshape(ncompetitor)
     else:
         print("Something is going wrong with the initial values!")
-        
-    #Generate activation gained in each cycle    
+
+    #Generate activation gained in each cycle
     actmat = np.random.normal(0, sigma, (ncontext, nrace, max_cycle, ncompetitor)) + np.tile(mu.reshape((ncontext, 1, 1, ncompetitor)), (1, nrace, max_cycle, 1))
 
     # Loop for each context
-    for i in range(0, ncontext):        
+    for i in range(0, ncontext):
         # Print progress
         if i in ten_pcs:
             print(f'{pcs}% Completed.')
             pcs += 10
-    
+
         # Loop for each trial
         for j in range(0, nrace):
-            
+
             # Set initial values
             acti = initial
             
@@ -309,19 +309,19 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
 
                 #new activation - inhibition
                 tacti = actmat[i, j, n] - inhibit_loss(acti, rate, sigmoid = sigmoid, beta = beta, x_zero = x_zero)
-                nacti = acti + np.where(tacti > 0, (1 - acti) * tacti, acti * tacti)  - np.tile(decay, ncompetitor)
+                nacti = acti + np.where(tacti > 0, (1 - acti) * tacti, acti * tacti)  - np.tile(decay, ncompetitor) * acti
 
                 # Activation does not become negative or exceed 1
                 nacti[nacti < 0] = 0
                 nacti[nacti > 1] = 1
 
                 acti = nacti.reshape(ncompetitor)
-                n += 1    
-                
+                n += 1
+
             context.append(i)
             winner.append(np.argmax(acti))
             ft.append(n)
-            
+
     df_trial = pd.DataFrame({"context_id": context, "response":winner, "ft":ft})
     # Compute reaction times based on assumptions: (i) each cycle is 25ms, and (ii) it takes 350ms for non-lexical processes for production
     df_trial["rt_25"] = df_trial["ft"] * 25 + 350
@@ -332,14 +332,14 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
     win_count = df_trial[["context_id", "response", "ft"]].groupby(["context_id", "response"], as_index = False).count().rename(columns = {"ft": "count"})
 
     df_summary = pd.merge(pd.merge(average_ft, total_count), win_count)
-  
+
     # Compute cloze probabilities
     df_summary["cloze_prob"] = df_summary["count"] / df_summary["total_count"]
-    
+
     # Get modal cloze probs
     m_cloze = df_summary[["context_id", "cloze_prob"]].groupby(["context_id"], as_index = False).max().rename(columns = {"cloze_prob": "modal_prob"})
     df_summary = pd.merge(df_summary, m_cloze, how = "left")
-    
+
     # Import the cloze data back to the trial data
     df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "modal_prob"]], how = "left")
     print("Done.")
@@ -352,18 +352,18 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
 # simulate races for a single context until an item wins and get a data frame
 # Whe no competitor wins, the one with the largetst activation at the last cycle is treated as the winner
 def single_context_complete(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, rate = 0.2, sigmoid = True, beta = 35, x_zero = 0.5, cm = True, decay = 0):
-    
+
     fts = []
     winners = []
-    
+
     for i in range(0, nrace):
         # Get the activation for one context
-        actmat = race.single_race(mu, sigma, max_cycle = max_cycle, threshold = threshold, init = init, rate = rate, sigmoid = sigmoid, beta = beta, x_zero = x_zero, cm = cm, decay = decay)        
-        
-        
+        actmat = race.single_race(mu, sigma, max_cycle = max_cycle, threshold = threshold, init = init, rate = rate, sigmoid = sigmoid, beta = beta, x_zero = x_zero, cm = cm, decay = decay)
+
+
         fts.append(actmat.shape[0] - 1) # Nth cycle (initial one is 0th cycle)
         winners.append(np.argmax(actmat[-1]))
-            
+
     df = pd.DataFrame({"winner": winners, "ft": fts})
-    
+
     return df
