@@ -254,7 +254,6 @@ def act2df(activation, threshold):
 
 
 def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, rate = 0.2, sigmoid = True, beta = 35, x_zero = 0.5, decay = 0):
-
     # Basically the same as other race + act2df, but runs faster without outputting activation patterns
 
     ncontext = np.shape(mu)[0]
@@ -265,16 +264,13 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
     ft = []
 
     # Progress
-    ten_pcs = [round(nc * ncompetitor / 10) for nc in range(1, 10)]
-    pcs = 10
-
-
+    #tic = round(leng / 10)
+    ten_pcs = round(ncontext/10)
+    #pcs = 10
 
     # Reshape mu and create a two dimension array (Context x Competitor)
     if mu.ndim == 1:
         mu = np.reshape(mu, [1, len(mu)])
-    elif mu.ndim > 2:
-        print("Too many dimensions for mu")
 
     # Set initial values. If an integer is passed, copy that and create an array.
     # If an array is passed, use that as the initial values.
@@ -282,25 +278,18 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
         initial = np.tile(init, ncompetitor)
     elif len(init) == ncompetitor:
         initial = init.reshape(ncompetitor)
-    else:
-        print("Something is going wrong with the initial values!")
 
     #Generate activation gained in each cycle
     actmat = np.random.normal(0, sigma, (ncontext, nrace, max_cycle, ncompetitor)) + np.tile(mu.reshape((ncontext, 1, 1, ncompetitor)), (1, nrace, max_cycle, 1))
 
+
     # Loop for each context
     for i in range(0, ncontext):
-        # Print progress
-        if i in ten_pcs:
-            print(f'{pcs}% Completed.')
-            pcs += 10
 
         # Loop for each trial
         for j in range(0, nrace):
-
             # Set initial values
             acti = initial
-            
 
             n = 0
             # Loop until the maximum iteration or something reach the threshold
@@ -322,6 +311,12 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
             winner.append(np.argmax(acti))
             ft.append(n)
 
+        # Print progress when simulations for one context ends
+        if ((i + 1) % ten_pcs) == 0:
+            print("■" * ((i + 1) // ten_pcs), "□"*(10-((i + 1) // ten_pcs)), sep="", end=" : ")
+            print(str(i + 1).zfill(3), "/", ncontext, "\r", sep="", end="")
+
+
     df_trial = pd.DataFrame({"context_id": context, "response":winner, "ft":ft})
     # Compute reaction times based on assumptions: (i) each cycle is 25ms, and (ii) it takes 350ms for non-lexical processes for production
     df_trial["rt_25"] = df_trial["ft"] * 25 + 350
@@ -342,7 +337,6 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
 
     # Import the cloze data back to the trial data
     df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "modal_prob"]], how = "left")
-    print("Done.")
 
     return df_trial, df_summary
 
