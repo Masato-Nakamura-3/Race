@@ -8,5 +8,5 @@ Use `help()` function to learn about what each function is doing and see `race_s
 
 9/26/2022
 
-- Updated the default parameters in race_sample.ipynb based on Staub et al., (2015)'s experimental data.
+- Updated the default parameters in race_sample.ipynb based on Staub et al. (2015)'s experimental data.
 - Updated the `race_fast` function to show progress in a better way.
