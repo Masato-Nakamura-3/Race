@@ -265,7 +265,10 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
 
     # Progress
     #tic = round(leng / 10)
-    ten_pcs = round(ncontext/10)
+    if ncontext > 9:
+        ten_pcs = round(ncontext/10)
+    else:
+        ten_pcs = 1
     #pcs = 10
 
     # Reshape mu and create a two dimension array (Context x Competitor)
@@ -312,7 +315,7 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
             ft.append(n)
 
         # Print progress when simulations for one context ends
-        if ((i + 1) % ten_pcs) == 0:
+        if (ncontext > 9) & (((i + 1) % ten_pcs) == 0):
             print("■" * ((i + 1) // ten_pcs), "□"*(10-((i + 1) // ten_pcs)), sep="", end=" : ")
             print(str(i + 1).zfill(3), "/", ncontext, "\r", sep="", end="")
 
