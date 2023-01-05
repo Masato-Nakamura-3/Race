@@ -218,14 +218,14 @@ def act2df(activation, threshold):
     Returns
     -------
     df_trial
-        A pandas data frame with three columns. "context_id" specifies the id of the context, "ft" specifies the cycle where the first item reaches the threshold, "response" specifies the id of the winner competitor, and "rt_25" is the reaction times.
+        A pandas data frame with three columns. "context_id" specifies the id of the context, "response" specifies the id of the winner competitor, "ft" is the cycle where the first item reaches the threshold, and "rt_25" is the reaction times. "cloze prob" is the cloze probability *including* races without winners, and "cloze_prob_sum1" is the cloze probability *excluding* those races (so that the sum of the cloze probabilities for the same context is always 1). "modal prob" is the highest cloze probability for the context based on "cloze prob".
     df_summary
-        A pandas data frame that summarizes df_trial. "total_count" represents the number of races in each context, "count" is the number of wins by each competitor, "ft" is the average finishing time.
+        A pandas data frame that summarizes df_trial. In addition to the columns same as df_trial, "total_count" represents the number of races in each context, "count" is the number of wins by each competitor, "ft" is the average finishing time.
     """
     # Find all activation greater than the threshold and the context, race, cycle, and competitor information of those situations
-    context, race, cycle, competitor = np.where(activation > threshold)
+    context, trial, cycle, competitor = np.where(activation > threshold)
     # Find the indices of the first cycles where one item reached the threshold in each race for each context
-    th_idx = [np.where((context == i) &  (race == j))[0][0] for i in range(0, np.shape(activation)[0]) for j in range(0,np.shape(activation)[1])]
+    th_idx = [np.where((context == i) &  (trial == j))[0][0] for i in range(np.shape(activation)[0]) for j in range(np.shape(activation)[1]) if np.sum((context == i) &  (trial == j)) > 0]
 
     df_trial = pd.DataFrame({"context_id": context[th_idx], "response":competitor[th_idx], "ft":cycle[th_idx]})
     # Compute reaction times based on assumptions: (i) each cycle is 25ms, and (ii) it takes 350ms for non-lexical processes for production
@@ -239,14 +239,18 @@ def act2df(activation, threshold):
     df_summary = pd.merge(pd.merge(average_ft, total_count), win_count)
 
     # Compute cloze probabilities
-    df_summary["cloze_prob"] = df_summary["count"] / df_summary["total_count"]
+    # Cloze probability NOT excluding for races without winners
+    df_summary["cloze_prob"] = df_summary["count"] / np.shape(activation)[1]
+    # Cloze probability excluding for races without winners
+    df_summary["cloze_prob_sum1"] = df_summary["count"] / df_summary["total_count"]
+
 
     # Get modal cloze probs
     m_cloze = df_summary[["context_id", "cloze_prob"]].groupby(["context_id"], as_index = False).max().rename(columns = {"cloze_prob": "modal_prob"})
     df_summary = pd.merge(df_summary, m_cloze, how = "left")
 
     # Import the cloze data back to the trial data
-    df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "modal_prob"]], how = "left")
+    df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "cloze_prob_sum1", "modal_prob"]], how = "left")
 
     return df_trial, df_summary
 
@@ -289,6 +293,12 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
     # Loop for each context
     for i in range(0, ncontext):
 
+        # Print progress when simulations for one context begins
+        if (ncontext > 9) & (((i + 1) % ten_pcs) == 0):
+            print("■" * ((i + 1) // ten_pcs), "□"*(10-((i + 1) // ten_pcs)), sep="", end=" : ")
+            print(str(i + 1).zfill(3), "/", ncontext, "\r", sep="", end="")
+
+
         # Loop for each trial
         for j in range(0, nrace):
             # Set initial values
@@ -310,14 +320,14 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
                 acti = nacti.reshape(ncompetitor)
                 n += 1
 
+            # No winner if no candidate reaches the threshold
+            if np.argmax(acti) < threshold:
+                continue
+
             context.append(i)
             winner.append(np.argmax(acti))
             ft.append(n)
 
-        # Print progress when simulations for one context ends
-        if (ncontext > 9) & (((i + 1) % ten_pcs) == 0):
-            print("■" * ((i + 1) // ten_pcs), "□"*(10-((i + 1) // ten_pcs)), sep="", end=" : ")
-            print(str(i + 1).zfill(3), "/", ncontext, "\r", sep="", end="")
 
 
     df_trial = pd.DataFrame({"context_id": context, "response":winner, "ft":ft})
@@ -332,18 +342,20 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
     df_summary = pd.merge(pd.merge(average_ft, total_count), win_count)
 
     # Compute cloze probabilities
-    df_summary["cloze_prob"] = df_summary["count"] / df_summary["total_count"]
+    # Cloze probability NOT excluding for races without winners
+    df_summary["cloze_prob"] = df_summary["count"] / nrace
+    # Cloze probability excluding for races without winners
+    df_summary["cloze_prob_sum1"] = df_summary["count"] / df_summary["total_count"]
+
 
     # Get modal cloze probs
     m_cloze = df_summary[["context_id", "cloze_prob"]].groupby(["context_id"], as_index = False).max().rename(columns = {"cloze_prob": "modal_prob"})
     df_summary = pd.merge(df_summary, m_cloze, how = "left")
 
     # Import the cloze data back to the trial data
-    df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "modal_prob"]], how = "left")
+    df_trial = pd.merge(df_trial, df_summary[["context_id", "response", "cloze_prob", "cloze_prob_sum1", "modal_prob"]], how = "left")
 
     return df_trial, df_summary
-
-
 
 # I am not using this function anymore
 # simulate races for a single context until an item wins and get a data frame
