@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 def activate(mulist, sigma):
-    """Randomly generate activation from normal distributions. This is used for other simulations.
+    """Randomly generate activation from normal distributions. This is used for other functions.
 
     Parameters
     ----------
