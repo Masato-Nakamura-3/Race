@@ -138,7 +138,7 @@ def single_race(mu, sigma, max_cycle = 100, threshold = 0.7, init = 0.1, rate = 
 
 
 
-def race(mu, sigma, nrace, max_cycle = 100, threshold = 10, init = 0.1, rate = 0.2, sigmoid = True, beta = 35, x_zero = 0.5, cm = True, decay = 0):
+def race(mu, sigma, nrace, max_cycle = 100, threshold = 10, init = 0.1, rate = 0.2, sigmoid = True, beta = 35, x_zero = 0.5, cm = False, decay = 0):
     """Simulate multiple races for a single set of candidate and output activation patterns. (i.e. One context with multiple participants)
 
     The simulation continues until either the number of the cycles reaches the upper limit or one of the competitors' activation reaches the threshold. By default a large value (10) is assigned to the threshold parameter to keep running the race until the maximum number of cycles, and it is recommended to keep that unless there is any reason not to do otherwise.
@@ -223,7 +223,7 @@ def act2df(activation, threshold):
         A pandas data frame that summarizes df_trial. In addition to the columns same as df_trial, "total_count" represents the number of races in each context, "count" is the number of wins by each competitor, "ft" is the average finishing time.
     """
     # Find all activation greater than the threshold and the context, race, cycle, and competitor information of those situations
-    context, trial, cycle, competitor = np.where(activation > threshold)
+    context, trial, cycle, competitor = np.where(activation >= threshold)
     # Find the indices of the first cycles where one item reached the threshold in each race for each context
     th_idx = [np.where((context == i) &  (trial == j))[0][0] for i in range(np.shape(activation)[0]) for j in range(np.shape(activation)[1]) if np.sum((context == i) &  (trial == j)) > 0]
 
@@ -321,7 +321,7 @@ def race_fast(mu, sigma, nrace, max_cycle = 100, threshold = 0.7, init = 0.1, ra
                 n += 1
 
             # No winner if no candidate reaches the threshold
-            if np.argmax(acti) < threshold:
+            if np.max(acti) < threshold:
                 continue
 
             context.append(i)
